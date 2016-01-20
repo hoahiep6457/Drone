@@ -10,7 +10,7 @@ pid_t PID_Roll;
 pid_t PID_Yaw;
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-float PID_Adjustment(pid_t *pid, float setpoint, float target)
+float PID_Update(pid_t *pid, float setpoint, float target)
 {
 	float error = setpoint - target;
 	float diff =  error - pid->lastError;
