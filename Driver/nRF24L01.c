@@ -1,15 +1,14 @@
 #include "stm32f4xx.h"
-#include "stm32f4_system.h"
 #include "nRF24L01.h"
 #include "delay_ctrl.h"
 #include "stm32f4xx_spi.h"
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-u8 TxBuf[SendTimes][TxBufSize] = {0};
-u8 RxBuf[ReadTimes][RxBufSize] = {0};
+uint8_t TxBuf[SendTimes][TxBufSize] = {0};
+uint8_t RxBuf[ReadTimes][RxBufSize] = {0};
 
-u8 TX_ADDRESS[TX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };		
-u8 RX_ADDRESS[RX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };
+uint8_t TX_ADDRESS[TX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };		
+uint8_t RX_ADDRESS[RX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 
@@ -17,16 +16,16 @@ void nRF24L01_HW_Init(void);
 void nRF24L01_RX_Mode(void);
 void nRF24L01_TX_Mode(void);
 
-u8 nRF24L01_SPI_RW(u8 wbyte);
-void nRF24L01_SPI_Write_Byte(u8 wbyte);
-u8 nRF24L01_SPI_Read_Byte(void);
-void nRF24L01_Write_Reg(u8 reg, u8 value);
-u8 nRF24L01_Read_Reg(u8 reg);
-void nRF24L01_Write_Buf(u8 Addr, u8 *wBuf, u8 Bytes);
-void nRF24L01_Read_Buf(u8 Addr, u8 *rBuf, u8 Bytes);
-u8 nRF24L01_Check(void);
-u8 nRF24L01_Tx_Data(u8 *TxBuf);
-u8 nRF24L01_Rx_Data(u8 *RxBuf);
+uint8_t nRF24L01_SPI_RW(uint8_t wbyte);
+void nRF24L01_SPI_Write_Byte(uint8_t wbyte);
+uint8_t nRF24L01_SPI_Read_Byte(void);
+void nRF24L01_Write_Reg(uint8_t reg, uint8_t value);
+uint8_t nRF24L01_Read_Reg(uint8_t reg);
+void nRF24L01_Write_Buf(uint8_t Addr, uint8_t *wBuf, uint8_t Bytes);
+void nRF24L01_Read_Buf(uint8_t Addr, uint8_t *rBuf, uint8_t Bytes);
+uint8_t nRF24L01_Check(void);
+uint8_t nRF24L01_Tx_Data(uint8_t *TxBuf);
+uint8_t nRF24L01_Rx_Data(uint8_t *RxBuf);
 
 void nRF24L01_SPI_CSN_H(void);
 void nRF24L01_SPI_CSN_L(void);
@@ -74,15 +73,15 @@ void nRF24L01_HW_Init(void)
 	GPIO_Init(GPIO_CE, &GPIO_InitStructure);
 	
 	/* Enable GPIO of IRQ */
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 	/* Configure CE pin */
-	GPIO_InitStructure.GPIO_Pin =   GPIO_Pin_12;
+	GPIO_InitStructure.GPIO_Pin =   GPIO_Pin_3;
   	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IN;
   	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   	GPIO_InitStructure.GPIO_PuPd =  GPIO_PuPd_UP;
 
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
 	
 	/* SPI configuration */
@@ -128,7 +127,7 @@ void nRF24L01_CE_L(void)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void nRF24L01_Write_Reg(u8 reg, u8 value)
+void nRF24L01_Write_Reg(uint8_t reg, uint8_t value)
 {
 	nRF24L01_CE_L();
 	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
@@ -139,9 +138,9 @@ void nRF24L01_Write_Reg(u8 reg, u8 value)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-u8 nRF24L01_Read_Reg(u8 reg)
+uint8_t nRF24L01_Read_Reg(uint8_t reg)
 {
-	u8 rbuf;
+	uint8_t rbuf;
 	nRF24L01_CE_L();
 	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
 	nRF24L01_SPI_Write_Byte(reg); // select register to read
@@ -152,16 +151,16 @@ u8 nRF24L01_Read_Reg(u8 reg)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void nRF24L01_Write_Buf(u8 Addr, u8 *wBuf, u8 Bytes)
+void nRF24L01_Write_Buf(uint8_t Addr, uint8_t *wBuf, uint8_t Bytes)
 {
-	u8 i;
+	uint8_t i;
 
 	nRF24L01_CE_L();
 	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
 
 	nRF24L01_SPI_Write_Byte(Addr);
 
-	for(i=0; i<Bytes, i++)
+	for(i=0; i<Bytes; i++)
 	{
 		nRF24L01_SPI_Write_Byte(wBuf[i]);
 	}
@@ -169,18 +168,18 @@ void nRF24L01_Write_Buf(u8 Addr, u8 *wBuf, u8 Bytes)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void nRF24L01_Read_Buf(u8 Addr, u8 *rBuf, u8 Bytes)
+void nRF24L01_Read_Buf(uint8_t Addr, uint8_t *rBuf, uint8_t Bytes)
 {
-	u8 i;
+	uint8_t i;
 
 	nRF24L01_CE_L();
 	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
 
 	nRF24L01_SPI_Write_Byte(Addr);
 
-	for(i=0; i<Bytes, i++)
+	for(i=0; i<Bytes; i++)
 	{
-		rbuf[i] = nRF24L01_SPI_Read_Byte();
+		rBuf[i] = nRF24L01_SPI_Read_Byte();
 	}
 	nRF24L01_SPI_CSN_H();// CSN High, terminal SPI transaction
 
@@ -188,7 +187,7 @@ void nRF24L01_Read_Buf(u8 Addr, u8 *rBuf, u8 Bytes)
 
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-u8 nRF24L01_SPI_RW(u8 wbyte)
+uint8_t nRF24L01_SPI_RW(uint8_t wbyte)
 {
 	/* Loop while DR register in not emplty */
   	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_TXE) == RESET);
@@ -201,7 +200,7 @@ u8 nRF24L01_SPI_RW(u8 wbyte)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void nRF24L01_SPI_Write_Byte(u8 wbyte)
+void nRF24L01_SPI_Write_Byte(uint8_t wbyte)
 {
 	/* Loop while DR register in not emplty */
   	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_TXE) == RESET);
@@ -214,7 +213,7 @@ void nRF24L01_SPI_Write_Byte(u8 wbyte)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-u8 nRF24L01_SPI_Read_Byte(void)
+uint8_t nRF24L01_SPI_Read_Byte(void)
 {
 	/* Loop while DR register in not emplty */
   	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_TXE) == RESET);
@@ -228,11 +227,11 @@ u8 nRF24L01_SPI_Read_Byte(void)
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 
-u8 nRF24L01_Check(void)
+uint8_t nRF24L01_Check(void)
 {
-	u8 TestBuf[5] = {0xC2,0xC2,0xC2,0xC2,0xC2};
-	u8 CheckBuf[5];
-	u8 i;
+	uint8_t TestBuf[5] = {0xC2,0xC2,0xC2,0xC2,0xC2};
+	uint8_t CheckBuf[5];
+	uint8_t i;
 
 	nRF24L01_Write_Buf(WRITE_nRF_REG + TX_ADDR, TestBuf, 5);
 	nRF24L01_Read_Buf(TX_ADDR, CheckBuf, 5);
@@ -247,16 +246,16 @@ u8 nRF24L01_Check(void)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-u8 nRF24L01_Tx_Data(u8 *TxBuf)
+uint8_t nRF24L01_Tx_Data(uint8_t *TxBuf)
 {
-	u8 Sta;
+	uint8_t Sta;
 
 	nRF24L01_CE_L();
 	nRF24L01_Write_Buf(WR_TX_PLOAD, TxBuf, TX_PLOAD_WIDTH);
 	nRF24L01_CE_H();
 
 
-	while(NRF_IRQ!=0);
+	while(nRF24l01_IRQ != 0)
 	Sta = nRF24L01_Read_Reg(NRFRegSTATUS);
 	nRF24L01_Write_Reg(WRITE_nRF_REG + NRFRegSTATUS, Sta);
 	nRF24L01_Write_Reg(FLUSH_TX, NOP);
@@ -270,13 +269,13 @@ u8 nRF24L01_Tx_Data(u8 *TxBuf)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-u8 nRF24L01_Rx_Data(u8 *RxBuf)
+uint8_t nRF24L01_Rx_Data(uint8_t *RxBuf)
 {
-	u8 Sta;
+	uint8_t Sta;
 
-	NRF_CE = 1;
-	while(NRF_IRQ!=0);
-	NRF_CE = 0;
+	nRF24L01_CE_H();
+	while(nRF24l01_IRQ!=0)
+	nRF24L01_CE_L();
 
 	Sta = nRF24L01_Read_Reg(NRFRegSTATUS);
 	nRF24L01_Write_Reg(WRITE_nRF_REG + NRFRegSTATUS, Sta);

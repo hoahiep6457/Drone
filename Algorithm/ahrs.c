@@ -1,12 +1,11 @@
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-#include "stm32f4x_system.h"
 #include "ahrs.h"
-#include "quaternion.h"
+
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 //#define Kp 2.0f         // proportional gain governs rate of convergence to accelerometer/magnetometer
-//#define Ki 0.005f       // integral gain governs rate of convergence of Gyro.yroscope biases
+//#define Ki 0.005f       // integral gain governs rate of convergence of gyroscope biases
 // #define Kp 10.0f
 // #define Ki 0.008f
 #define Kp 3.5f
@@ -24,7 +23,7 @@
 float exInt, eyInt, ezInt, q0, q1, q2, q3, y, p, r; 
 EulerAngle AngE = {0};
 Accel_t Accel = {0};
-Gyro.yro_t Gyro.yro= {0};
+Gyro_t Gyro= {0};
 Magnet_t Magnet= {0};
 /*=====================================================================================================*/
 /*=====================================================================================================*/
@@ -40,7 +39,7 @@ void AHRS_Init(void)
 /*=====================================================================================================*/
 void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz) {
 
-    float norm,halfT;
+    float norm;
     float hx, hy, hz, bx, bz;
     float vx, vy, vz, wx, wy, wz;
     float ex, ey, ez;
@@ -132,14 +131,14 @@ void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, flo
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void AHRS_Update_test(Accel_t Accel, Gyro.yro_t Gyro.yro, Magnet_t Magnet) 
+void AHRS_Update_test(Accel_t Accel, Gyro_t Gyro, Magnet_t Magnet) 
 {
 
-    float norm,halfT;
+    float norm;
     float hx, hy, hz, bx, bz;
     float vx, vy, vz, wx, wy, wz;
     float ex, ey, ez;
-    static float AnGyro.z_Temp = 0.0f;
+    static float AngleZ_Temp = 0.0f;
 
     // auxiliary variables to reduce number of repeated operations
     float q0q0 = q0*q0;
@@ -192,15 +191,15 @@ void AHRS_Update_test(Accel_t Accel, Gyro.yro_t Gyro.yro, Magnet_t Magnet)
 
 
     // adjusted Gyro.yroscope measurements
-    Gyro.yro.x +=Kp*ex + exInt;
+    Gyro.x +=Kp*ex + exInt;
     Gyro.y +=Kp*ey + eyInt;
     Gyro.z +=Kp*ez + ezInt;
 
     // integrate quaternion rate and normalise
-    q0 = q0 + (-q1*Gyro.yro.x - q2*Gyro.y - q3*Gyro.z)*halfT;
-    q1 = q1 + (q0*Gyro.yro.x + q2*Gyro.z - q3*Gyro.y)*halfT;
-    q2 = q2 + (q0*Gyro.y - q1*Gyro.z + q3*Gyro.yro.x)*halfT;
-    q3 = q3 + (q0*Gyro.z + q1*Gyro.y - q2*Gyro.yro.x)*halfT;  
+    q0 = q0 + (-q1*Gyro.x - q2*Gyro.y - q3*Gyro.z)*halfT;
+    q1 = q1 + (q0*Gyro.x + q2*Gyro.z - q3*Gyro.y)*halfT;
+    q2 = q2 + (q0*Gyro.y - q1*Gyro.z + q3*Gyro.x)*halfT;
+    q3 = q3 + (q0*Gyro.z + q1*Gyro.y - q2*Gyro.x)*halfT;  
 
     // normalise quaternion
     norm = sqrt(q0*q0 + q1*q1 + q2*q2 + q3*q3);
@@ -212,14 +211,14 @@ void AHRS_Update_test(Accel_t Accel, Gyro.yro_t Gyro.yro, Magnet_t Magnet)
     toEuler();
 
     /* Complementary Filter */
-    AnGyro.z_Temp += Gyro.z*dt;
-    AnGyro.z_Temp = AnGyro.z_Temp*CF_A + CF_B*y;
-    if(AnGyro.z_Temp > 360.0f)
-        y = AnGyro.z_Temp - 360.0f;
-    else if(AnGyro.z_Temp < 0.0f)
-        y = AnGyro.z_Temp + 360.0f;
+    AngleZ_Temp += Gyro.z*dt;
+    AngleZ_Temp = AngleZ_Temp*CF_A + CF_B*y;
+    if(AngleZ_Temp > 360.0f)
+        y = AngleZ_Temp - 360.0f;
+    else if(AngleZ_Temp < 0.0f)
+        y = AngleZ_Temp + 360.0f;
     else
-        y = AnGyro.z_Temp;
+        y = AngleZ_Temp;
 
     AngE.Pitch = p;
     AngE.Roll = r;
@@ -277,7 +276,7 @@ void AHRS_Update_test(Accel_t Accel, Gyro.yro_t Gyro.yro, Magnet_t Magnet)
 //   }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void toEuler()
+void toEuler(void)
   {
     /* STANDARD ZYX
      y=atan2(2*q1*q2-2*q0*q3,2*q0*q0+2*q1*q1-1);

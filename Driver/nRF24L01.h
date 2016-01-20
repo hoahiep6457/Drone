@@ -3,6 +3,7 @@
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 /* Private define ------------------------------------------------------------*/
+#include "stm32f4xx.h"
 
 //Define the commands for operate the nRF24L01P
 #define READ_nRF_REG    0x00  // Command for read register
@@ -114,16 +115,16 @@
 
 #define SUCCESS 				0
 #define ERROR					-1
-//#define nRF24l01_IRQ    GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_12); 
+#define nRF24l01_IRQ    GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_3)
 
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 void nRF24L01_HW_Init(void);
 void nRF24L01_RX_Mode(void);
 void nRF24L01_TX_Mode(void);
-u8 nRF24L01_Check(void);
-u8 nRF24L01_Tx_Data(u8 *TxBuf);
-u8 nRF24L01_Rx_Data(u8 *RxBuf);
+uint8_t nRF24L01_Check(void);
+uint8_t nRF24L01_Tx_Data(uint8_t *TxBuf);
+uint8_t nRF24L01_Rx_Data(uint8_t *RxBuf);
 
 /*=====================================================================================================*/
 /*=====================================================================================================*/
