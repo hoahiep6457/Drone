@@ -28,7 +28,7 @@
 #define ACC_LSB   2048 //Accel FS16 
 #define RAD_TO_DEG  57.2957795131
 #define DEG_TO_RAD  0.01745329251
-#define DT				0.0025 // T sampling
+#define DT				0.0025 // T sampling 2.5 ms
 
 /*=====================================================================================================*/
 /*=====================================================================================================*/
@@ -87,10 +87,6 @@ int main(void)
   TIMBase_Config();
   //Rx_Configuration();//Configuration interrupt to calculate dutycycle received from Rx
   //PID_Init_Start();
-	//SysTick_Config(SystemCoreClock / 999);//start to read MPU each 1 ms
-  //start PWM to test
-  //BasicThr = 800;
-  //printf(" Quadcopter Project\r\n");
   while (1)
   {
   }

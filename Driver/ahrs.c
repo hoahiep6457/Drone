@@ -6,7 +6,7 @@
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 //#define Kp 2.0f         // proportional gain governs rate of convergence to accelerometer/magnetometer
-//#define Ki 0.005f       // integral gain governs rate of convergence of gyroscope biases
+//#define Ki 0.005f       // integral gain governs rate of convergence of Gyro.yroscope biases
 // #define Kp 10.0f
 // #define Ki 0.008f
 #define Kp 3.5f
@@ -23,6 +23,9 @@
 
 float exInt, eyInt, ezInt, q0, q1, q2, q3, y, p, r; 
 EulerAngle AngE = {0};
+Accel_t Accel = {0};
+Gyro.yro_t Gyro.yro= {0};
+Magnet_t Magnet= {0};
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 void AHRS_Init(void)
@@ -129,7 +132,102 @@ void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, flo
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-// void AHRS_UpdateIMU(float gx, float gy, float gz, float ax, float ay, float az) {
+void AHRS_Update_test(Accel_t Accel, Gyro.yro_t Gyro.yro, Magnet_t Magnet) 
+{
+
+    float norm,halfT;
+    float hx, hy, hz, bx, bz;
+    float vx, vy, vz, wx, wy, wz;
+    float ex, ey, ez;
+    static float AnGyro.z_Temp = 0.0f;
+
+    // auxiliary variables to reduce number of repeated operations
+    float q0q0 = q0*q0;
+    float q0q1 = q0*q1;
+    float q0q2 = q0*q2;
+    float q0q3 = q0*q3;
+    float q1q1 = q1*q1;
+    float q1q2 = q1*q2;
+    float q1q3 = q1*q3;
+    float q2q2 = q2*q2;   
+    float q2q3 = q2*q3;
+    float q3q3 = q3*q3;          
+
+    // normalise the measurements
+    norm = sqrt(Accel.x*Accel.x + Accel.y*Accel.y + Accel.z*Accel.z);       
+    Accel.x = Accel.x / norm;
+    Accel.y = Accel.y / norm;
+    Accel.z = Accel.z / norm;
+    norm = sqrt(Magnet.x*Magnet.x + Magnet.y*Magnet.y + Magnet.z*Magnet.z);          
+    Magnet.x = Magnet.x / norm;
+    Magnet.y = Magnet.y / norm;
+    Magnet.z = Magnet.z / norm;         
+
+    // compute reference direction of flux
+    hx = 2*Magnet.x*(0.5 - q2q2 - q3q3) + 2*Magnet.y*(q1q2 - q0q3) + 2*Magnet.z*(q1q3 + q0q2);
+    hy = 2*Magnet.x*(q1q2 + q0q3) + 2*Magnet.y*(0.5 - q1q1 - q3q3) + 2*Magnet.z*(q2q3 - q0q1);
+    hz = 2*Magnet.x*(q1q3 - q0q2) + 2*Magnet.y*(q2q3 + q0q1) + 2*Magnet.z*(0.5 - q1q1 - q2q2);         
+    bx = sqrt((hx*hx) + (hy*hy));
+    bz = hz;        
+
+    // estimated direction of gravity and flux (v and w)
+    vx = 2*(q1q3 - q0q2);
+    vy = 2*(q0q1 + q2q3);
+    vz = q0q0 - q1q1 - q2q2 + q3q3;
+    wx = 2*bx*(0.5 - q2q2 - q3q3) + 2*bz*(q1q3 - q0q2);
+    wy = 2*bx*(q1q2 - q0q3) + 2*bz*(q0q1 + q2q3);
+    wz = 2*bx*(q0q2 + q1q3) + 2*bz*(0.5 - q1q1 - q2q2);  
+
+    // error is sum of cross product between reference direction of fields and direction measured by sensors
+    ex = (Accel.y*vz - Accel.z*vy) + (Magnet.y*wz - Magnet.z*wy);
+    ey = (Accel.z*vx - Accel.x*vz) + (Magnet.z*wx - Magnet.x*wz);
+    ez = (Accel.x*vy - Accel.y*vx) + (Magnet.x*wy - Magnet.y*wx);
+
+
+    // integral error scaled integral gain
+    exInt += ex*Ki;
+    eyInt += ey*Ki;
+    ezInt += ez*Ki;
+
+
+
+    // adjusted Gyro.yroscope measurements
+    Gyro.yro.x +=Kp*ex + exInt;
+    Gyro.y +=Kp*ey + eyInt;
+    Gyro.z +=Kp*ez + ezInt;
+
+    // integrate quaternion rate and normalise
+    q0 = q0 + (-q1*Gyro.yro.x - q2*Gyro.y - q3*Gyro.z)*halfT;
+    q1 = q1 + (q0*Gyro.yro.x + q2*Gyro.z - q3*Gyro.y)*halfT;
+    q2 = q2 + (q0*Gyro.y - q1*Gyro.z + q3*Gyro.yro.x)*halfT;
+    q3 = q3 + (q0*Gyro.z + q1*Gyro.y - q2*Gyro.yro.x)*halfT;  
+
+    // normalise quaternion
+    norm = sqrt(q0*q0 + q1*q1 + q2*q2 + q3*q3);
+    q0 = q0 / norm;
+    q1 = q1 / norm;
+    q2 = q2 / norm;
+    q3 = q3 / norm;
+
+    toEuler();
+
+    /* Complementary Filter */
+    AnGyro.z_Temp += Gyro.z*dt;
+    AnGyro.z_Temp = AnGyro.z_Temp*CF_A + CF_B*y;
+    if(AnGyro.z_Temp > 360.0f)
+        y = AnGyro.z_Temp - 360.0f;
+    else if(AnGyro.z_Temp < 0.0f)
+        y = AnGyro.z_Temp + 360.0f;
+    else
+        y = AnGyro.z_Temp;
+
+    AngE.Pitch = p;
+    AngE.Roll = r;
+    AngE.Yaw = y;
+}
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+// void AHRS_UpdateIMU(float Gyro.yro.x, float Gyro.y, float Gyro.z, float ax, float ay, float az) {
 //     float norm,halfT;
 //     float vx, vy, vz;
 //     float ex, ey, ez;         
@@ -157,16 +255,16 @@ void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, flo
 //     eyInt = eyInt + ey*Ki;
 //     ezInt = ezInt + ez*Ki;
 
-//     // adjusted gyroscope measurements
-//     gx = gx + Kp*ex + exInt;
-//     gy = gy + Kp*ey + eyInt;
-//     gz = gz + Kp*ez + ezInt;
+//     // adjusted Gyro.yroscope measurements
+//     Gyro.yro.x = Gyro.yro.x + Kp*ex + exInt;
+//     Gyro.y = Gyro.y + Kp*ey + eyInt;
+//     Gyro.z = Gyro.z + Kp*ez + ezInt;
 
 //     // integrate quaternion rate and normalise
-//     q0 = q0 + (-q1*gx - q2*gy - q3*gz)*halfT;
-//     q1 = q1 + (q0*gx + q2*gz - q3*gy)*halfT;
-//     q2 = q2 + (q0*gy - q1*gz + q3*gx)*halfT;
-//     q3 = q3 + (q0*gz + q1*gy - q2*gx)*halfT;  
+//     q0 = q0 + (-q1*Gyro.yro.x - q2*Gyro.y - q3*Gyro.z)*halfT;
+//     q1 = q1 + (q0*Gyro.yro.x + q2*Gyro.z - q3*Gyro.y)*halfT;
+//     q2 = q2 + (q0*Gyro.y - q1*Gyro.z + q3*Gyro.yro.x)*halfT;
+//     q3 = q3 + (q0*Gyro.z + q1*Gyro.y - q2*Gyro.yro.x)*halfT;  
 
 //     // normalise quaternion
 //     norm = sqrt(q0*q0 + q1*q1 + q2*q2 + q3*q3);
