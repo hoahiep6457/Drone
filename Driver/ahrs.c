@@ -33,7 +33,8 @@ void AHRS_Init(void)
     q0=1.0;
     q1=q2=q3=0;
 }
-
+/*=====================================================================================================*/
+/*=====================================================================================================*/
 void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz) {
 
     float norm,halfT;
@@ -111,12 +112,13 @@ void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, flo
     q3 = q3 / norm;
 
     toEuler();
+
     /* Complementary Filter */
     AngZ_Temp += gz*dt;
     AngZ_Temp = AngZ_Temp*CF_A + CF_B*y;
-    if(AngZ_Temp>360.0f)
+    if(AngZ_Temp > 360.0f)
         y = AngZ_Temp - 360.0f;
-    else if(AngZ_Temp<0.0f)
+    else if(AngZ_Temp < 0.0f)
         y = AngZ_Temp + 360.0f;
     else
         y = AngZ_Temp;
@@ -125,7 +127,8 @@ void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, flo
     AngE.Roll = r;
     AngE.Yaw = y;
 }
-
+/*=====================================================================================================*/
+/*=====================================================================================================*/
 // void AHRS_UpdateIMU(float gx, float gy, float gz, float ax, float ay, float az) {
 //     float norm,halfT;
 //     float vx, vy, vz;
@@ -174,7 +177,8 @@ void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, flo
 
 //     toEuler();
 //   }
-
+/*=====================================================================================================*/
+/*=====================================================================================================*/
 void toEuler()
   {
     /* STANDARD ZYX
@@ -186,3 +190,5 @@ void toEuler()
     p=-asin(2 * q1 * q3 - 2 * q0 * q2); // theta
     r=atan2(2 * q2 * q3 + 2 * q0 * q1, 2 * q0 * q0 + 2 * q3 * q3 - 1); // phi
   }
+/*=====================================================================================================*/
+/*=====================================================================================================*/

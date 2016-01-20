@@ -2,11 +2,6 @@
 #define _NRF_24L01_H_
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-#ifdef __cplusplus
- extern "C" {
-#endif
-/*=====================================================================================================*/
-/*=====================================================================================================*/
 /* Private define ------------------------------------------------------------*/
 
 //Define the commands for operate the nRF24L01P
@@ -80,6 +75,12 @@
 #define RX_PW_P4        0x15  // Size of receive data in channel 4
 #define RX_PW_P5        0x16  //  Size of receive data in channel 5
 #define FIFO_STATUS     0x17  // FIFO Status
+
+#define MAX_RT  		0x10	
+#define TX_DS			0x20 	
+
+#define RX_DR			0x40	
+#define CHANAL			40
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 // define  GPIO for SPI
@@ -90,7 +91,7 @@
 
 
 #define GPIO_SPI              			GPIOA
-#define GPIO_Pin_CS              		GPIO_Pin_4
+#define GPIO_Pin_CSN              		GPIO_Pin_4
 #define GPIO_Pin_SPI_SCK      			GPIO_Pin_5
 #define GPIO_Pin_SPI_MISO     			GPIO_Pin_6
 #define GPIO_Pin_SPI_MOSI     			GPIO_Pin_7
@@ -101,9 +102,18 @@
 #define GPIO_Pin_SPI_MOSI_SOURCE     	GPIO_PinSource7
 #define RCC_AHB1Periph_GPIO_SPI       	RCC_AHB1Periph_GPIOA
 
-#define	ADR_WIDTH				5
-#define RX_PLOAD_WIDTH  5
-#define TX_PLOAD_WIDTH	5
+#define SendTimes				2
+#define ReadTimes				2
+#define TxBufSize				32
+#define RxBufSize				32
+
+#define TX_ADR_WIDTH			5  	
+#define TX_PLOAD_WIDTH			32  
+#define RX_ADR_WIDTH			5
+#define RX_PLOAD_WIDTH			32
+
+#define SUCCESS 				0
+#define ERROR					-1
 //#define nRF24l01_IRQ    GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_12); 
 
 /*=====================================================================================================*/
@@ -111,13 +121,10 @@
 void nRF24L01_HW_Init(void);
 void nRF24L01_RX_Mode(void);
 void nRF24L01_TX_Mode(void);
-void nRF24L01_Tx_Packet(unsigned char* tx_buffer);
-unsigned char nRF24L01_Rx_Packet(unsigned char* rx_buffer);
-/*=====================================================================================================*/
-/*=====================================================================================================*/
-#ifdef __cplusplus
-}
-#endif
+u8 nRF24L01_Check(void);
+u8 nRF24L01_Tx_Data(u8 *TxBuf);
+u8 nRF24L01_Rx_Data(u8 *RxBuf);
+
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 #endif

@@ -1,26 +1,35 @@
 #include "stm32f4xx.h"
+#include "stm32f4_system.h"
 #include "nRF24L01.h"
 #include "delay_ctrl.h"
 #include "stm32f4xx_spi.h"
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-unsigned char  TX_ADDRESS[ADR_WIDTH]= {0xE7,0xE7,0xE7,0xE7,0xE7};
-unsigned char  RX_ADDRESS[ADR_WIDTH]= {0xE7,0xE7,0xE7,0xE7,0xE7};
+u8 TxBuf[SendTimes][TxBufSize] = {0};
+u8 RxBuf[ReadTimes][RxBufSize] = {0};
+
+u8 TX_ADDRESS[TX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };		
+u8 RX_ADDRESS[RX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 
 void nRF24L01_HW_Init(void);
 void nRF24L01_RX_Mode(void);
 void nRF24L01_TX_Mode(void);
-unsigned char nRF24L01_SPI_Write_Byte(unsigned char data);
-unsigned char SPI_Write_Reg(unsigned char reg, unsigned char value);
-unsigned char SPI_Read_Reg(unsigned char reg);
-unsigned char SPI_Write(unsigned char reg, unsigned char *wbuf, unsigned char len);
-unsigned char SPI_Read(unsigned char reg, unsigned char *rbuf, unsigned char len);
-unsigned char nRF24L01_Rx_Packet(unsigned char* rx_buffer);
-void nRF24L01_Tx_Packet(unsigned char* tx_buffer);
-void nRF24L01_SPI_NSS_H(void);
-void nRF24L01_SPI_NSS_L(void);
+
+u8 nRF24L01_SPI_RW(u8 wbyte);
+void nRF24L01_SPI_Write_Byte(u8 wbyte);
+u8 nRF24L01_SPI_Read_Byte(void);
+void nRF24L01_Write_Reg(u8 reg, u8 value);
+u8 nRF24L01_Read_Reg(u8 reg);
+void nRF24L01_Write_Buf(u8 Addr, u8 *wBuf, u8 Bytes);
+void nRF24L01_Read_Buf(u8 Addr, u8 *rBuf, u8 Bytes);
+u8 nRF24L01_Check(void);
+u8 nRF24L01_Tx_Data(u8 *TxBuf);
+u8 nRF24L01_Rx_Data(u8 *RxBuf);
+
+void nRF24L01_SPI_CSN_H(void);
+void nRF24L01_SPI_CSN_L(void);
 void nRF24L01_CE_H(void);
 void nRF24L01_CE_L(void);
 /*=====================================================================================================*/
@@ -36,20 +45,21 @@ void nRF24L01_HW_Init(void)
 	/* SPI Periph clock enable */
 	RCC_APB2PeriphClockCmd(RCC_APBPeriph_SPI, ENABLE);
 
-	/* Connect SPI pins to AF */
-	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_CS_SOURCE,GPIO_AF_SPI1);
-	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_SCK_SOURCE,GPIO_AF_SPI1);
-	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_MOSI_SOURCE,GPIO_AF_SPI1);
-	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_MISO_SOURCE,GPIO_AF_SPI1);
-	
 	/* Configure SPI pins:  SCK ,MOSI, MISO*/
-	GPIO_InitStructure.GPIO_Pin =    GPIO_Pin_CS | GPIO_Pin_SPI_SCK | GPIO_Pin_SPI_MOSI | GPIO_Pin_SPI_MISO;
+	GPIO_InitStructure.GPIO_Pin =    GPIO_Pin_CSN | GPIO_Pin_SPI_SCK | GPIO_Pin_SPI_MOSI | GPIO_Pin_SPI_MISO;
 	GPIO_InitStructure.GPIO_Mode =  GPIO_Mode_AF;
   	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   	GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_DOWN;
 	
   	GPIO_Init(GPIO_SPI, &GPIO_InitStructure);
+
+  	/* Connect SPI pins to AF */
+	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_CS_SOURCE, GPIO_AF_SPI1);
+	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_SCK_SOURCE, GPIO_AF_SPI1);
+	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_MOSI_SOURCE, GPIO_AF_SPI1);
+	GPIO_PinAFConfig(GPIO_SPI, GPIO_Pin_SPI_MISO_SOURCE, GPIO_AF_SPI1);
+	
 
 	/* Enable GPIO of CHIP SELECT */
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIO_CE, ENABLE);
@@ -94,72 +104,17 @@ void nRF24L01_HW_Init(void)
 	SPI_Cmd(SPI, ENABLE);
 
 }
-/*=====================================================================================================*/
-/*=====================================================================================================*/
-void nRF24L01_RX_Mode(void)
-{
-	nRF24L01_CE_L();
-	SPI_Write_Reg(WRITE_nRF_REG + CONFIG, 0x39);
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + SETUP_AW, 0x03); // setup add width 5 bytes
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + RF_CH,0x02);// setup frequency
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + RF_SETUP,  0x07);// setup power and rate
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + RX_PW_P0,32); //Number of bytes in data P0
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + EN_RXADDR, 0x01); //Enable data P0
-	nRF24L01_Delay_us(20);
-	SPI_Write(WRITE_nRF_REG + TX_ADDR, TX_ADDRESS, ADR_WIDTH); // write address into tx_add
-	nRF24L01_Delay_us(20);
-	SPI_Write(WRITE_nRF_REG + RX_ADDR_P0, RX_ADDRESS, ADR_WIDTH); // write address into rx_add_p0
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + EN_AA, 0x00);     //disable auto-ack for all channels      
-	nRF24L01_Delay_us(20);
-	
-	SPI_Write_Reg(WRITE_nRF_REG + CONFIG, 0x33); // enable power up and prx
-	nRF24L01_Delay_us(20);
-  	nRF24L01_CE_H();
-	nRF24L01_Delay_us(2000);
 
-}
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void nRF24L01_TX_Mode(void)
+void nRF24L01_SPI_CSN_H(void)
 {
-  	nRF24L01_CE_L();
-	SPI_Write_Reg(WRITE_nRF_REG + SETUP_AW, 0x03); // setup add width 5 bytes
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + CONFIG, 0x38); // enable power up and ptx
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + EN_RXADDR, 0x01); //Enable data P0
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + SETUP_RETR, 0x00);//Auto Retransmit Delay: 500 us, Auto Retransmit Count: Up to 2 Re-Transmit
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + RF_CH,0x02);// setup frequency
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + RF_SETUP ,0x07); //setup power 0dbm, rate 1Mbps
-	nRF24L01_Delay_us(20);
-	SPI_Write(WRITE_nRF_REG + TX_ADDR, TX_ADDRESS, ADR_WIDTH); // write address into tx_add
-	nRF24L01_Delay_us(20);
-	SPI_Write(WRITE_nRF_REG + RX_ADDR_P0, RX_ADDRESS, ADR_WIDTH); // write address into rx_add_p0
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + EN_AA, 0x00);     // Disable Auto.Ack:Pipe0
-	
-	nRF24L01_Delay_us(200);
-	
-}
-/*=====================================================================================================*/
-/*=====================================================================================================*/
-void nRF24L01_SPI_NSS_H(void)
-{
-	GPIO_SetBits(GPIO_CE, GPIO_Pin_CS);
+	GPIO_SetBits(GPIO_SPI, GPIO_Pin_CSN);
 }
 
-void nRF24L01_SPI_NSS_L(void)
+void nRF24L01_SPI_CSN_L(void)
 {
-	GPIO_ResetBits(GPIO_CE, GPIO_Pin_CS);
+	GPIO_ResetBits(GPIO_SPI, GPIO_Pin_CSN);
 }
 
 void nRF24L01_CE_H(void)
@@ -173,133 +128,200 @@ void nRF24L01_CE_L(void)
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-unsigned char nRF24L01_SPI_Write_Byte(unsigned char data)
+void nRF24L01_Write_Reg(u8 reg, u8 value)
 {
-	/* Loop while DR register in not emplty */
-  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_TXE) == RESET);
+	nRF24L01_CE_L();
+	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
 
-  	/* Send byte through the SPIx peripheral */
-  	SPI_I2S_SendData(SPI, data);
-
-  	/* Wait to receive a byte */
-  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_RXNE) == RESET);
-
-  	/* Return the byte read from the SPI bus */
-  	return SPI_I2S_ReceiveData(SPI);
-}
-/*=====================================================================================================*/
-/*=====================================================================================================*/
-unsigned char SPI_Write_Reg(unsigned char reg, unsigned char value)
-{
-	unsigned char status;
-
-	nRF24L01_SPI_NSS_L(); //CSN Low, start SPI transaction
-	nRF24L01_Delay_us(20);
-	status = nRF24L01_SPI_Write_Byte(reg); // select register to write
+	nRF24L01_SPI_Write_Byte(reg); // select register to write
 	nRF24L01_SPI_Write_Byte(value); //write data to it
-	nRF24L01_SPI_NSS_H();// CSN High, terminal SPI transaction
-
-	return status;
+	nRF24L01_SPI_CSN_H();// CSN High, terminal SPI transaction
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-unsigned char SPI_Read_Reg(unsigned char reg)
+u8 nRF24L01_Read_Reg(u8 reg)
 {
-	unsigned char rbuf;
-
-	nRF24L01_SPI_NSS_L(); //CSN Low, start SPI transaction
-	nRF24L01_Delay_us(20);
+	u8 rbuf;
+	nRF24L01_CE_L();
+	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
 	nRF24L01_SPI_Write_Byte(reg); // select register to read
-	rbuf = nRF24L01_SPI_Write_Byte(0); //receive data from register
-	nRF24L01_SPI_NSS_H();// CSN High, terminal SPI transaction
+	rbuf = nRF24L01_SPI_Read_Byte(); //receive data from register
+	nRF24L01_SPI_CSN_H();// CSN High, terminal SPI transaction
 
 	return rbuf;
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-unsigned char SPI_Write(unsigned char reg, unsigned char *wbuf, unsigned char len)
+void nRF24L01_Write_Buf(u8 Addr, u8 *wBuf, u8 Bytes)
 {
-	unsigned int status, i;
+	u8 i;
 
-	nRF24L01_SPI_NSS_L(); //CSN Low, start SPI transaction
-	nRF24L01_Delay_us(20);
-	status = nRF24L01_SPI_Write_Byte(reg);
-	for(i=0; i<len; i++)
+	nRF24L01_CE_L();
+	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
+
+	nRF24L01_SPI_Write_Byte(Addr);
+
+	for(i=0; i<Bytes, i++)
 	{
-		nRF24L01_SPI_Write_Byte(*wbuf);
-		wbuf++;
+		nRF24L01_SPI_Write_Byte(wBuf[i]);
 	}
-	nRF24L01_SPI_NSS_H();// CSN High, terminal SPI transaction
-
-	return status;
-
+	nRF24L01_SPI_CSN_H();// CSN High, terminal SPI transaction
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-unsigned char SPI_Read(unsigned char reg, unsigned char *rbuf, unsigned char len)
+void nRF24L01_Read_Buf(u8 Addr, u8 *rBuf, u8 Bytes)
 {
-	unsigned int status, i;
+	u8 i;
 
-	nRF24L01_SPI_NSS_L(); //CSN Low, start SPI transaction
-	nRF24L01_Delay_us(20);
-	status = nRF24L01_SPI_Write_Byte(reg);
+	nRF24L01_CE_L();
+	nRF24L01_SPI_CSN_L(); //CSN Low, start SPI transaction
 
-	for(i=0; i<len; i++)
+	nRF24L01_SPI_Write_Byte(Addr);
+
+	for(i=0; i<Bytes, i++)
 	{
-		*rbuf = nRF24L01_SPI_Write_Byte(0);
-		rbuf++;
+		rbuf[i] = nRF24L01_SPI_Read_Byte();
 	}
-	nRF24L01_SPI_NSS_H();// CSN High, terminal SPI transaction
+	nRF24L01_SPI_CSN_H();// CSN High, terminal SPI transaction
 
-	return status;
+}
+
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+u8 nRF24L01_SPI_RW(u8 wbyte)
+{
+	/* Loop while DR register in not emplty */
+  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_TXE) == RESET);
+  	SPI->DR = wbyte;
+
+  	/* Wait to receive a byte */
+  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_RXNE) == RESET);
+
+  	return SPI->DR;
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-unsigned char nRF24L01_Rx_Packet(unsigned char* rx_buffer)
+void nRF24L01_SPI_Write_Byte(u8 wbyte)
 {
-	unsigned char flag = 0;
-	unsigned char status;
+	/* Loop while DR register in not emplty */
+  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_TXE) == RESET);
 
-	status = SPI_Read_Reg(NRFRegSTATUS);
-	nRF24L01_SPI_NSS_L(); //CSN Low, start SPI transaction
-	nRF24L01_Delay_us(20);
+  	/* Send byte through the SPIx peripheral */
+  	SPI->DR = wbyte;
 
-	if(status & 0x40) //Data Ready Rx FIFO interrupt
-	{
-		SPI_Read(RD_RX_PLOAD, rx_buffer, RX_PLOAD_WIDTH);
-		flag = 1;
-	}
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + NRFRegSTATUS, 0x40); // clear bit
-	nRF24L01_Delay_us(20);
-	nRF24L01_SPI_NSS_L();
-	nRF24L01_SPI_Write_Byte(0xE2); //Flush RX FIFO
-	nRF24L01_SPI_NSS_H();
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + CONFIG, 0x33); // enable power up and prx
+  	/* Wait to receive a byte */
+  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_RXNE) == RESET);
+}
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+u8 nRF24L01_SPI_Read_Byte(void)
+{
+	/* Loop while DR register in not emplty */
+  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_TXE) == RESET);
+	SPI->DR = 0xFF;
+	/* Wait to receive a byte */
+  	while(SPI_I2S_GetFlagStatus(SPI, SPI_I2S_FLAG_RXNE) == RESET);
+
+  	return SPI->DR;
+}
+
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+
+u8 nRF24L01_Check(void)
+{
+	u8 TestBuf[5] = {0xC2,0xC2,0xC2,0xC2,0xC2};
+	u8 CheckBuf[5];
+	u8 i;
+
+	nRF24L01_Write_Buf(WRITE_nRF_REG + TX_ADDR, TestBuf, 5);
+	nRF24L01_Read_Buf(TX_ADDR, CheckBuf, 5);
+           
+	for(i=0; i<5; i++)
+		if(CheckBuf[i]!=0xC2)	break;
+
+	if(i==5)
+		return SUCCESS;		
+	else
+		return ERROR;			
+}
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+u8 nRF24L01_Tx_Data(u8 *TxBuf)
+{
+	u8 Sta;
+
+	nRF24L01_CE_L();
+	nRF24L01_Write_Buf(WR_TX_PLOAD, TxBuf, TX_PLOAD_WIDTH);
 	nRF24L01_CE_H();
-	nRF24L01_Delay_us(20);
 
-	return flag;
+
+	while(NRF_IRQ!=0);
+	Sta = nRF24L01_Read_Reg(NRFRegSTATUS);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + NRFRegSTATUS, Sta);
+	nRF24L01_Write_Reg(FLUSH_TX, NOP);
+
+	if(Sta & MAX_RT)
+		return MAX_RT;
+	else if(Sta & TX_DS)
+		return TX_DS;
+	else
+		return ERROR;
 }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void nRF24L01_Tx_Packet(unsigned char* tx_buffer)
+u8 nRF24L01_Rx_Data(u8 *RxBuf)
+{
+	u8 Sta;
+
+	NRF_CE = 1;
+	while(NRF_IRQ!=0);
+	NRF_CE = 0;
+
+	Sta = nRF24L01_Read_Reg(NRFRegSTATUS);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + NRFRegSTATUS, Sta);
+
+	if(Sta&RX_DR) {
+		nRF24L01_Read_Buf(RD_RX_PLOAD, RxBuf, RX_PLOAD_WIDTH);
+		nRF24L01_Write_Reg(FLUSH_RX, NOP);
+		return RX_DR;
+	}
+	else
+		return ERROR;
+}
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+void nRF24L01_TX_Mode(void)
+{
+  	nRF24L01_CE_L();
+	nRF24L01_Write_Buf(WRITE_nRF_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);		
+	nRF24L01_Write_Buf(WRITE_nRF_REG + RX_ADDR_P0, RX_ADDRESS, RX_ADR_WIDTH);	
+	nRF24L01_Write_Reg(WRITE_nRF_REG + EN_AA, 0x01);		
+	nRF24L01_Write_Reg(WRITE_nRF_REG + EN_RXADDR, 0x01);	
+	nRF24L01_Write_Reg(WRITE_nRF_REG + SETUP_RETR, 0x05);	
+	nRF24L01_Write_Reg(WRITE_nRF_REG + RF_CH, CHANAL);		
+	nRF24L01_Write_Reg(WRITE_nRF_REG + RF_SETUP, 0x0f);		
+	nRF24L01_Write_Reg(WRITE_nRF_REG + CONFIG, 0x0e);			
+	nRF24L01_CE_H();
+	
+	nRF24L01_Delay_us(200);
+	
+}
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+void nRF24L01_RX_Mode(void)
 {
 	nRF24L01_CE_L();
-	SPI_Write_Reg(WRITE_nRF_REG+NRFRegSTATUS, 0x7E); // Write 1 to clear bit
-	nRF24L01_Delay_us(20);
-	SPI_Write_Reg(WRITE_nRF_REG + CONFIG, 0x3A); // enable power up and ptx
-	nRF24L01_Delay_us(20);
-	nRF24L01_SPI_NSS_L();  
-	nRF24L01_SPI_Write_Byte(FLUSH_TX);
-	nRF24L01_SPI_Write_Byte(0x00);
-	nRF24L01_SPI_NSS_H();  
-	nRF24L01_Delay_us(20);
-	SPI_Write(WR_TX_PLOAD, tx_buffer, TX_PLOAD_WIDTH);
-	nRF24L01_CE_H();
-	nRF24L01_Delay_us(300000);
-	nRF24L01_CE_L();
+
+	nRF24L01_Write_Buf(WRITE_nRF_REG + RX_ADDR_P0, RX_ADDRESS, RX_ADR_WIDTH);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + EN_AA, 0x01);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + EN_RXADDR, 0x01);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + RF_CH, CHANAL);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + RX_PW_P0, RX_PLOAD_WIDTH);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + RF_SETUP, 0x0f);
+	nRF24L01_Write_Reg(WRITE_nRF_REG + CONFIG, 0x0f);
+
+  	nRF24L01_CE_H();
 
 }
 /*=====================================================================================================*/

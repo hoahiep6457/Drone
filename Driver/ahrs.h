@@ -13,10 +13,10 @@ typedef struct {
 } EulerAngle;
 
 extern EulerAngle AngE;
-extern float exInt, eyInt, ezInt, q0, q1, q2, q3; 
+//extern float exInt, eyInt, ezInt, q0, q1, q2, q3; 
 /*=====================================================================================================*/
 /*=====================================================================================================*/
-void AHRS_Init( void );
+void AHRS_Init(void);
 void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz);
 /*=====================================================================================================*/
 /*=====================================================================================================*/
