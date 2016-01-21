@@ -115,8 +115,14 @@
 
 #define SUCCESS 				0
 #define ERROR					-1
-#define nRF24l01_IRQ    GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_3)
+#define nRF24l01_IRQ    		GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_3)
+/*=====================================================================================================*/
+/*=====================================================================================================*/
+uint8_t TxBuf[SendTimes][TxBufSize] = {0};
+uint8_t RxBuf[ReadTimes][RxBufSize] = {0};
 
+uint8_t TX_ADDRESS[TX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };		
+uint8_t RX_ADDRESS[RX_ADR_WIDTH] = { 0x34,0x43,0x10,0x10,0x01 };
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 void nRF24L01_HW_Init(void);

@@ -38,7 +38,7 @@ extern Magnet_t Magnet;
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 void AHRS_Init(void);
-void AHRS_Update(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz);
+void AHRS_Update(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
 void AHRS_Update_test(Accel_t Accel, Gyro_t Gyro, Magnet_t Magnet); 
 void toEuler(void);
 /*=====================================================================================================*/

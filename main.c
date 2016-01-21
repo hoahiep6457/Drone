@@ -63,6 +63,8 @@ float gyroX_angle, gyroY_angle, gyroZ_angle;
 float roll_angle, pitch_angle;
 int16_t BasicThr;
 extern float m_scale;
+uint8_t Sta = ERROR;
+uint8_t FSM_Sta = 1;
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 int main(void)
@@ -81,14 +83,22 @@ int main(void)
 	delay_ms(1000);//delay to avoid hating
   IMU_Get_Offset();//read MPU6050 to calib gyro
 	delay_ms(1000);//wait for MPU to stabilize
-  IMU_Get_Start();
+  //IMU_Get_Start();
   delay_ms(1000);//delay to avoid hating
-	
+  AHRS_Init();
+	nRF24L01_HW_Init();
   TIMBase_Config();
+  nRF24L01_RX_Mode();
   //Rx_Configuration();//Configuration interrupt to calculate dutycycle received from Rx
   //PID_Init_Start();
   while (1)
   {
+      
+    do {
+      Sta = nRF24L01_Rx_Data(TxBuf[0]);
+      printf("Txbuf=%d\n", Txbuf[0]);
+    } while(Sta == MAX_RT);
+
   }
 /*=====================================================================================================*/
 /*=====================================================================================================*/
@@ -101,9 +111,9 @@ void IMU_Get_Data(void)
   Update_MPU6050();
   UpdatePitchRoll();
   //Caculate Gyrorate 
-  gyroX_rate = (gyroX - gyroX_offset)/GYRO_LSB;
-  gyroY_rate = (gyroY - gyroY_offset)/GYRO_LSB;
-  gyroZ_rate = (gyroZ - gyroZ_offset)/GYRO_LSB;
+  gyroX_rate = gyroX / GYRO_LSB;
+  gyroY_rate = gyroY / GYRO_LSB;
+  gyroZ_rate = gyroZ / GYRO_LSB;
   //kalman filter
   gyroX_angle += gyroX_rate*DT;
   gyroY_angle += gyroY_rate*DT;
@@ -247,9 +257,13 @@ void Update_MPU6050(void)
   gyroZ = MPU6050data[6];
 
   //Kalman fiter value of Accel
-  accX_kalman = kalman_single(&kalman_single_X, accX, 5, 0.5);
-  accY_kalman = kalman_single(&kalman_single_Y, accY, 5, 0.5);
-  accZ_kalman = kalman_single(&kalman_single_Z, accZ, 5, 0.5);
+  accX = kalman_single(&kalman_single_X, accX, 5, 0.5);
+  accY = kalman_single(&kalman_single_Y, accY, 5, 0.5);
+  accZ = kalman_single(&kalman_single_Z, accZ, 5, 0.5);
+
+  gyroX -= gyroX_offset;
+  gyroY -= gyroY_offset;
+  gyroZ -= gyroZ_offset;
 }
 void Update_HMC5883L(void)
 {
@@ -264,11 +278,11 @@ void UpdatePitchRoll(void)
   // atan2 outputs the value of -π to π (radians) - see http://en.wikipedia.org/wiki/Atan2
   // It is then converted from radians to degrees
 #ifdef RESTRICT_PITCH // Eq. 25 and 26
-  angleX = atan2(accY_kalman,accZ_kalman) * RAD_TO_DEG;
-  angleY = atan(-accX_kalman / sqrt(accY_kalman * accY_kalman + accZ_kalman * accZ_kalman)) * RAD_TO_DEG;
+  angleX = atan2(accY, accZ) * RAD_TO_DEG;
+  angleY = atan(-accX / sqrt(accY * accY + accZ * accZ)) * RAD_TO_DEG;
 #else // Eq. 28 and 29
-  angleX = atan(accY_kalman / sqrt(accX_kalman * accX_kalman + accZ_kalman * accZ_kalman)) * RAD_TO_DEG;
-  angleY = atan2(-accX_kalman, accZ_kalman) * RAD_TO_DEG;
+  angleX = atan(accY / sqrt(accX * accX + accZ * accZ)) * RAD_TO_DEG;
+  angleY = atan2(-accX, accZ) * RAD_TO_DEG;
 #endif
 
 }
@@ -285,11 +299,6 @@ void UpdateYaw(void)
   magY -= magY_offset;
   magZ -= magZ_offset;
 
-  // magnor = sqrt(magX*magX + magY*magY + magZ*magZ);
-  // magX/=magnor;
-  // magY/=magnor;
-  // magZ/=magnor;
-
   roll_angle = angleX_kalman*DEG_TO_RAD;
   pitch_angle = angleY_kalman*DEG_TO_RAD;
   
@@ -300,7 +309,6 @@ void UpdateYaw(void)
  // angleZ *= -1;
 
 }
-
 /*=====================================================================================================*/
 /*=====================================================================================================*/
 void PID_Update(void)
@@ -384,8 +392,9 @@ void TIM4_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
   {
-   //do something
-    IMU_Get_Data();
+   //do something here
+    //IMU_Get_Data();
+    AHRS_Update(accX, accY, accZ, gyroX, gyroY, magX, magY, magZ);
     TIM_ClearITPendingBit(TIM4, TIM_IT_Update); 
   }
 }
